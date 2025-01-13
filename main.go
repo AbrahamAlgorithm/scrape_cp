@@ -116,7 +116,7 @@ func scrapeCourseraTerms(doc *goquery.Document) map[string]string {
 	return terms
 }
 
-func scrapeURL(url string, name string, scrapeFunc func(*goquery.Document) map[string]string, wg *sync.WaitGroup) {
+func scrapeURL(url string, scrapeFunc func(*goquery.Document) map[string]string, wg *sync.WaitGroup) {
 	defer wg.Done()
 
 	client := &http.Client{
@@ -168,7 +168,7 @@ func main() {
 
 	for _, source := range sources {
 		wg.Add(1)
-		go scrapeURL(source.URL, source.Name, source.ScrapeFunc, &wg)
+		go scrapeURL(source.URL, source.ScrapeFunc, &wg)
 	}
 
 	wg.Wait()
