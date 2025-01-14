@@ -2,7 +2,7 @@
 
 Scraping computer science terminology and definitions from multiple online sources.
 
-![CS Terms Scraper](./Screenshot%202025-01-14%20at%2011.06.50.png)
+![CS Terms Scraper](./APIResponse.png)
 
 ## Sources
 
