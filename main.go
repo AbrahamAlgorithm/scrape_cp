@@ -12,12 +12,29 @@ import (
 	"unicode"
 
 	"github.com/PuerkitoBio/goquery"
+	"github.com/gorilla/mux"
 )
 
 var (
 	globalTerms = make(map[string]string)
 	mutex       sync.Mutex
 )
+
+type ErrorResponse struct {
+	Error string `json:"error"`
+}
+
+type TermResponse struct {
+	Term       string `json:"term"`
+	Definition string `json:"definition"`
+}
+
+type SearchResponse struct {
+	Terms    []TermResponse `json:"terms"`
+	Count    int            `json:"count"`
+	Query    string         `json:"query,omitempty"`
+	TimeTook string         `json:"time_took"`
+}
 
 var sources = []struct {
 	URL        string
@@ -64,6 +81,7 @@ func isValidTerm(term, definition string) bool {
 	return true
 }
 
+// funtions to scrape terms from different sources
 func scrapeWikipediaTerms(doc *goquery.Document) map[string]string {
 	terms := make(map[string]string)
 
@@ -116,6 +134,7 @@ func scrapeCourseraTerms(doc *goquery.Document) map[string]string {
 	return terms
 }
 
+// URL scraping function with error handling and retries
 func scrapeURL(url string, scrapeFunc func(*goquery.Document) map[string]string, wg *sync.WaitGroup) {
 	defer wg.Done()
 
@@ -161,11 +180,91 @@ func scrapeURL(url string, scrapeFunc func(*goquery.Document) map[string]string,
 	mutex.Unlock()
 }
 
+func getAllTerms(w http.ResponseWriter, r *http.Request) {
+	mutex.Lock()
+	terms := make(map[string]string)
+	// Create a copy of the map to avoid holding the lock while encoding
+	for k, v := range globalTerms {
+		terms[k] = v
+	}
+	mutex.Unlock()
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(terms)
+}
+
+func getTerm(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	term := vars["term"]
+
+	mutex.Lock()
+	definition, exists := globalTerms[term]
+	mutex.Unlock()
+
+	if !exists {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusNotFound)
+		json.NewEncoder(w).Encode(map[string]string{"error": "term not found"})
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]string{term: definition})
+}
+
+func searchTerms(w http.ResponseWriter, r *http.Request) {
+	query := strings.ToLower(r.URL.Query().Get("q"))
+
+	if query == "" {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(map[string]string{"error": "search query is required"})
+		return
+	}
+
+	mutex.Lock()
+	results := make(map[string]string)
+	for term, def := range globalTerms {
+		if strings.Contains(strings.ToLower(term), query) ||
+			strings.Contains(strings.ToLower(def), query) {
+			results[term] = def
+		}
+	}
+	mutex.Unlock()
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(results)
+}
+
+func startAPIServer() {
+	router := mux.NewRouter()
+
+	// API endpoints with /api prefix for better organization
+	api := router.PathPrefix("/api").Subrouter()
+	api.HandleFunc("/terms", getAllTerms).Methods("GET")
+	api.HandleFunc("/terms/search", searchTerms).Methods("GET")
+	api.HandleFunc("/terms/{term}", getTerm).Methods("GET")
+
+	// Add simple request logging
+	router.Use(func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			start := time.Now()
+			next.ServeHTTP(w, r)
+			log.Printf("%s %s %v", r.Method, r.URL.Path, time.Since(start))
+		})
+	})
+
+	fmt.Println("API server is running on http://localhost:8080")
+	log.Fatal(http.ListenAndServe(":8080", router))
+}
+
 func main() {
 	var wg sync.WaitGroup
 
+	// Create output directory
 	os.MkdirAll("output", 0755)
 
+	// Scrape data from sources
 	for _, source := range sources {
 		wg.Add(1)
 		go scrapeURL(source.URL, source.ScrapeFunc, &wg)
@@ -177,12 +276,13 @@ func main() {
 		log.Fatal("No terms were found from any source")
 	}
 
+	// Save to JSON file
 	jsonData, err := json.MarshalIndent(globalTerms, "", "    ")
 	if err != nil {
 		log.Fatal("Failed to convert to JSON:", err)
 	}
 
-	timestamp := time.Now().Format("2025-01-02_15-04-05")
+	timestamp := time.Now().Format("2006-01-02_15-04-05")
 	filename := fmt.Sprintf("output/cs_terms_%s.json", timestamp)
 
 	err = os.WriteFile(filename, jsonData, 0644)
@@ -191,4 +291,7 @@ func main() {
 	}
 
 	fmt.Printf("Successfully scraped %d unique terms and saved to %s\n", len(globalTerms), filename)
+
+	// Start the API server
+	startAPIServer()
 }
