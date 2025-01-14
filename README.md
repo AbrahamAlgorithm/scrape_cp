@@ -14,5 +14,5 @@ The following sources are used to gather computer science terminology:
 ## Installation
 
 ```bash
-git clone https://github.com/yourusername/scrape_cp.git
+git clone https://github.com/AbrahamAlgorithm/scrape_cp.git
 cd scrape_cp
