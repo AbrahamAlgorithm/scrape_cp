@@ -27,4 +27,4 @@
     "XOR (Exclusive OR)": "XOR, short for Exclusive OR, is a logical operation that returns true only if the input operands have different boolean values. In computer science, XOR is commonly used for bitwise operations, error detection, and encryption algorithms. It is represented by the symbol \"^\" or \"⊕. \"",
     "YAML (YAML Ain't Markup Language)": "YAML is a human-readable data serialization format often used for configuration files and data exchange between different programming languages. It is designed to be simple and easy to read, with a syntax that uses indentation and key-value pairs. YAML is known for its readability and is often used in DevOps and configuration management.",
     "Zero-Day": "Zero-Day refers to a software vulnerability or security flaw discovered and exploited by hackers before the software developer or vendor becomes aware of it. It is called \"Zero-Day\" because there is zero-day time to fix or patch the vulnerability before it is exploited. Zero-Day vulnerabilities pose significant security risks and require immediate attention and mitigation."
-}
+} 
